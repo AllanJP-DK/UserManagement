@@ -1,0 +1,110 @@
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+CREATE OR REPLACE FUNCTION now_utc() returns timestamp as
+$$
+  select now() at time zone 'utc';
+$$ language sql;
+
+create table adresses (
+id uuid primary key default uuid_generate_v4(),
+street text not null,
+postalcode text not null
+);
+
+create table users (
+id uuid primary key default uuid_generate_v4(),
+username text not null,
+firstname text,
+lastname text,
+adress_id uuid references adresses(id),
+active boolean not null default true
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS users_name_lower_unique  ON users(lower(username)) WHERE active = true;
+
+create table roles (
+id uuid primary key default uuid_generate_v4(),
+rolename text not null,
+active boolean not null default true
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS roles_name_lower_unique  ON roles(lower(rolename)) WHERE active = true;
+
+create table users_roles(
+userid uuid references users(id),
+roleid uuid references roles(id),
+primary key (userid, roleid)
+);
+
+create table accessrights(
+id uuid primary key default uuid_generate_v4(),
+description text not null
+);
+
+create table roles_accessrights(
+roleid uuid references roles(id),
+accessrightid uuid references accessrights(id),
+primary key (roleid, accessrightid)
+);
+
+create table auditlogs(
+id uuid primary key default uuid_generate_v4(),
+table_name text,
+operation text not null,
+changed_at timestamp not null default now_utc(),
+userid uuid not null references users(id)
+);
+
+create index auditlogs_changedat_idx on auditlogs(changed_at);
+create index auditlogs_userid_idx on auditlogs(userid);
+--create index auditlogs_userid_idx on auditlogs(userid, changed_at);
+
+/* 
+Udkommenteret mine triggers, da det gik op for mig, at det er jo vigigt at kunne søge på hvad en enkelt bruger har lavet i auditlogs, men ved at bruge triggers her, 
+så har jeg ikke adgang til brugerId og dette skal så udføres i kode via API i stedet for 
+*/
+
+/*
+CREATE OR REPLACE FUNCTION auditlog_trigger_function()
+RETURNS TRIGGER AS
+$$
+BEGIN
+    -- Your trigger logic goes here
+    -- For example, to log changes to another table:
+    INSERT INTO auditlog(table_name, operation, changed_at)
+    VALUES (TG_TABLE_NAME, TG_OP, now_utc());
+    
+    -- For BEFORE triggers, you can modify NEW and return it
+    -- For AFTER triggers, the return value is typically ignored unless it's a ROW trigger
+    
+    -- Return NEW for INSERT/UPDATE triggers
+    -- Return OLD for DELETE triggers
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER users_trigger
+AFTER INSERT OR UPDATE OR DELETE ON users
+FOR EACH ROW
+EXECUTE FUNCTION auditlog_trigger_function();
+
+CREATE TRIGGER roles_trigger
+AFTER INSERT OR UPDATE OR DELETE ON roles
+FOR EACH ROW
+EXECUTE FUNCTION auditlog_trigger_function();
+
+CREATE TRIGGER oles_accessrights_trigger
+AFTER INSERT OR UPDATE OR DELETE ON roles_accessrights
+FOR EACH ROW
+EXECUTE FUNCTION auditlog_trigger_function();
+
+CREATE TRIGGER adresses_trigger
+AFTER INSERT OR UPDATE OR DELETE ON adresses
+FOR EACH ROW
+EXECUTE FUNCTION auditlog_trigger_function();
+*/
+
+/* 
+I dette tilfælde vil auditlog med tiden vokse sig stor, og blive sløv. Så man ville nok vælge at partitionere tabellen (partition by) over tidsstemplet (changed_at). 
+Dette laves som eksempelvis et cron job, der opretter partitioner 3 måneder frem 
+*/
