@@ -33,12 +33,16 @@ namespace UserManagement.Services
                             var actionName = controllerActionDescriptor.ActionName;
                             var httpMethod = context.Request.Method;
 
-                            _logger.LogInformation($"Processing audit for {httpMethod} {controllerName}/{actionName}");
+                            _logger.LogInformation(
+                                $"Processing audit for {httpMethod} {controllerName}/{actionName}"
+                            );
 
                             string tableName = GetTableNameFromController(controllerName);
                             string operation = GetOperationFromHttpMethod(httpMethod);
 
-                            if (!string.IsNullOrEmpty(tableName) && !string.IsNullOrEmpty(operation))
+                            if (
+                                !string.IsNullOrEmpty(tableName) && !string.IsNullOrEmpty(operation)
+                            )
                             {
                                 var userId = currentUserService.GetCurrentUserId() ?? Guid.Empty;
                                 _logger.LogInformation($"Logging audit: {tableName} {operation} by user {userId}");

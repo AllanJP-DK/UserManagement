@@ -38,10 +38,12 @@ namespace UserManagement.Repositories
             var normalizedUsername = username.ToLower();
             if (userId.HasValue)
             {
+                // true: if no other active user has this username (username is unique or only used by the current user)
                 return !await _context.Users
                     .AnyAsync(u => u.Username.ToLower() == normalizedUsername && u.Id != userId.Value && u.Active);
             }
 
+            // true: if no other active user has this username (username is unique)
             return !await _context.Users
                 .AnyAsync(u => u.Username.ToLower() == normalizedUsername && u.Active);
         }
